@@ -5,7 +5,7 @@ require(rpart)
 #avec le dataset sonar
 sonar <- read.csv("~/GIT/adaboostR/sonar.all-data", header=FALSE)
 
-adaboostM1(V61~.,sonar,nIter=5,maxDepth=5)
+adaboostM1(V61~.,sonar,nIter = 5,maxDepth=5)
 
 #avec le dataset plrx de kaggle
 plrx <- read.delim("~/GIT/adaboostR/plrx.txt", header=FALSE)
@@ -80,3 +80,4 @@ adaboostM1=function(formula,data,nIter=10,maxDepth=1){
 }
 
 
+getPredictionRPart(X1~.,data,runif(100),2)
