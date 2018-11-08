@@ -15,7 +15,7 @@ plrx$V13[which(plrx$V13=="2")]="1"
 
 adaboostM1(V13~.,plrx,nIter=5,maxDepth=1)
 
-#données aléatoires
+# données aléatoires
 data=matrix(runif(1000),ncol=10)
 data[,1]=rbinom(100,1,0.5)
 data=data.frame(data)
