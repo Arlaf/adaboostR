@@ -1,0 +1,21 @@
+Priorités :
+
+- Finir adaboostM1
+- Ergonomiser : pouvoir mettre n'importe quelle forme de variable cible
+
+
+Moins prioritaire :
+
+- Permettre d'utiliser autre chose qu'un arbre comme classificateur faible
+- Essayer d'inclure les probabilités renvoyées par la predict() d'un rpart()
+
+
+Hardcore :
+
+- Trouver un meilleur nom pour la fonction getError()
+
+
+Terminés :
+
+- Vérifier le facteur de normalisation
+- Vérifier la distribution qui ne somme pas à 1
