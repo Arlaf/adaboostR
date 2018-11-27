@@ -43,21 +43,36 @@ adaboostM1 <- function(formula, data, nIter = 10, maxDepth = 1){
   return(distrib)
 }
 
-adaboostBin <- function(formula, data, nIter = 10, maxDepth = 1){
-  m <- nrow(data)
-  nColY <- which(colnames(data) == all.vars(formula)[1]) #numero de colonne où se trouve Y dans data
-  data[,nColY] <- as.factor(data[,nColY])
+adaboostBin <- function(formula, data, nIter = 10, maxDepth = 2){
   
+  environment(formula) <- environment()
+  
+  m <- nrow(data)
+  
+  # Identification de la colonne à prédire
+  nColY <- which(colnames(data) == all.vars(formula)[1])
+  
+  # SOLUTION TEMPORAIRE
+  data[,nColY] <- as.character(data[,nColY])
+  
+  # correspondance entre les modalités de la colonne à prédire et -1 ; +1
+  modalities <- unique(data[,nColY])
+  data[,nColY] <- ifelse(data[,nColY] == modalities[1], -1, 1)
+  
+  
+  # Initialisation de la matrice des poids
   distrib <- matrix(NA, nrow = m, ncol = nIter)
   distrib[,1] <- 1/m
   
   listeArbres <- list()
   alphas <- numeric(nIter)
   
-  environment(formula) <- environment()
-  
   for(i in 1:nIter){
-    modele <- rpart(formula = formula, data = data, weights = distrib[,i], control = rpart.control(maxdepth = maxDepth))
+    modele <- rpart(formula = formula,
+                    data = data,
+                    weights = distrib[,i],
+                    control = rpart.control(maxdepth = maxDepth),
+                    method = "class")
     listeArbres[[i]] <- modele
     
     prediction <- getPredictionRPart(arbre = modele, data = data)
@@ -72,15 +87,17 @@ adaboostBin <- function(formula, data, nIter = 10, maxDepth = 1){
     
     alphas[i] <- 1/2*log((1 - erreur$error)/erreur$error)
     
-    #Z <- 2 * sqrt(alphas[i]) # facteur de normalisation trouvé sur wiki
-    Z <- 2*sqrt(erreur$error*(1- erreur$error)) # Z du MIT
+    # Facteur de normalisation
+    Z <- 2*sqrt(erreur$error*(1- erreur$error))
     
     if(i < nIter){
-      distrib[,i+1] <- distrib[,i] / Z * exp(-sign * alphas[i]) #probl?matique, distrib ne somme pas toujours ? 1????
+      distrib[,i+1] <- distrib[,i] / Z * exp(-sign * alphas[i])
     }
     
   }
-  return(list(classifiers = listeArbres, alphas = alphas))
+  return(list(classifiers = listeArbres,
+              alphas = alphas,
+              modalities = modalities))
 }
 
 predictAdaboost <- function(adaBooster,newdata){
@@ -91,5 +108,7 @@ predictAdaboost <- function(adaBooster,newdata){
   }
   predictions <- ifelse(predictions == "1", 1, -1)
   res <- sign(predictions%*%adaBooster$alphas)
+  res <- ifelse(res == -1, adaBooster$modalities[1], adaBooster$modalities[2])
   return(res)
 }
+
