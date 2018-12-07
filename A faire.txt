@@ -1,7 +1,6 @@
 Priorités :
 
 - Finir adaboostM1
-- Ergonomiser : pouvoir mettre n'importe quelle forme de variable cible
 
 
 Moins prioritaire :
@@ -19,3 +18,4 @@ Terminés :
 
 - Vérifier le facteur de normalisation
 - Vérifier la distribution qui ne somme pas à 1
+- Ergonomiser : pouvoir mettre n'importe quelle forme de variable cible

@@ -1,5 +1,6 @@
 #mettre quelque part une vérification pour que le nombre de classes a prédire ne pose pas problème
 getPredictionRPart <- function(arbre, data){
+  
   m <- nrow(data)
   pred <- predict(arbre, newdata = data)
   classes <- colnames(pred)
@@ -20,30 +21,67 @@ getError <- function(obs, pred, distrib){
   return(res)
 }
 
-adaboostM1 <- function(formula, data, nIter = 10, maxDepth = 1){
+adaboostM1 <- function(formula, data, nIter = 10, maxDepth = 5, bootstrap = T){
+  
+  environment(formula) <- environment()
+  
   m <- nrow(data)
   nColY <- which(colnames(data) == all.vars(formula)[1]) #numero de colonne où se trouve Y dans data
+  
   distrib <- matrix(0, nrow = m, ncol = nIter)
   distrib[,1] <- 1/m
+  
+  listeArbres <- list()
+  betas <- numeric(nIter)
+  
   for (i in 1:nIter){
-    prediction <- getPredictionRPart(formule = formula, data = data, poids = distrib[,i], maxDepth = maxDepth)
-    erreur <- getError(data[,nColY], prediction)
-    if(erreur$error>0.5){
-      nIter <- i-1
-      return("pas cool man")
+    
+    if(bootstrap){
+      ech <- sample(1:nrow(data), nrow(data), replace = T, prob = distrib[,i])
+      ech <- data[ech,]
+      modele <- rpart(formula = formula,
+                      data = ech,
+                      control = rpart.control(maxdepth = maxDepth),
+                      method = "class")
+      
+    }else{
+      modele <- rpart(formula = formula,
+                      data = data,
+                      weights = distrib[,i],
+                      control = rpart.control(maxdepth = maxDepth),
+                      method = "class") 
     }
-    beta <- erreur$error/(1-erreur$error)
+    
+    prediction <- getPredictionRPart(modele, data)
+    erreur <- getError(data[,nColY], prediction, distrib[,i])
+    
+    # Si on dépasse 50% d'erreur sur la dernière itération on l'ignore et on s'arrête
+    if(erreur$error>0.5){
+      i <- i - 1
+      betas <- betas[1:i]
+      
+      return(list(classifiers = listeArbres,
+                  factors = betas,
+                  modalities = unique(data[, nColY])))
+    }
+    
+    listeArbres[[i]] <- modele
+    betas[i] <- erreur$error/(1-erreur$error)
     if(i < nIter){ # pas besoin de la distrib nIter+1
-      Z <- 2*sqrt(beta) # facteur de normalisation trouvé sur wiki
-      distrib[,(i+1)] <- distrib[,i]/Z
-      distrib[erreur$indTrue,(i+1)] <- distrib[erreur$indTrue,(i+1)]*beta
+      # Z <- 2*sqrt(betas[i]) # facteur de normalisation trouvé sur wiki
+
+      distrib[,(i+1)] <- distrib[,i]
+      distrib[erreur$indTrue,(i+1)] <- distrib[erreur$indTrue,(i+1)]*betas[i]
+      Z <- sum(distrib[,(i+1)])
+      distrib[,(i+1)] <- distrib[,(i+1)]/Z
     }
   }
-  #à finir
-  return(distrib)
+  return(list(classifiers = listeArbres,
+              factors = betas,
+              modalities = unique(data[, nColY])))
 }
 
-adaboostBin <- function(formula, data, nIter = 10, maxDepth = 2){
+adaboostBin <- function(formula, data, nIter = 10, maxDepth = 5, bootstrap = T){
   
   environment(formula) <- environment()
   
@@ -67,12 +105,23 @@ adaboostBin <- function(formula, data, nIter = 10, maxDepth = 2){
   listeArbres <- list()
   alphas <- numeric(nIter)
   
+  
   for(i in 1:nIter){
-    modele <- rpart(formula = formula,
-                    data = data,
-                    weights = distrib[,i],
-                    control = rpart.control(maxdepth = maxDepth),
-                    method = "class")
+    if(bootstrap){
+      ech <- sample(1:nrow(data), nrow(data), replace = T, prob = distrib[,i])
+      ech <- data[ech,]
+      modele <- rpart(formula = formula,
+                      data = ech,
+                      control = rpart.control(maxdepth = maxDepth),
+                      method = "class")
+      
+    }else{
+      modele <- rpart(formula = formula,
+                      data = data,
+                      weights = distrib[,i],
+                      control = rpart.control(maxdepth = maxDepth),
+                      method = "class") 
+    }
     listeArbres[[i]] <- modele
     
     prediction <- getPredictionRPart(arbre = modele, data = data)
@@ -96,19 +145,43 @@ adaboostBin <- function(formula, data, nIter = 10, maxDepth = 2){
     
   }
   return(list(classifiers = listeArbres,
-              alphas = alphas,
+              factors = alphas,
               modalities = modalities))
 }
 
-predictAdaboost <- function(adaBooster,newdata){
-  nbClassif <- length(adaBooster$alphas)
+predictAdaboost <- function(adaBooster, newdata){
+  
+  nbClassif <- length(adaBooster$factors)
+  
+  # Initialisation de la matrice des prédictions
   predictions <- matrix(nrow = nrow(newdata), ncol = nbClassif)
+  
   for (i in 1:nbClassif){
-    predictions[,i] <- getPredictionRPart(adaBooster$classifiers[[i]],newdata)
+    predictions[,i] <- getPredictionRPart(adaBooster$classifiers[[i]], newdata)
   }
-  predictions <- ifelse(predictions == "1", 1, -1)
-  res <- sign(predictions%*%adaBooster$alphas)
-  res <- ifelse(res == -1, adaBooster$modalities[1], adaBooster$modalities[2])
+  
+  # Classification binaire
+  if(length(adaBooster$modalities) == 2){
+    
+    # Convertit les "0" et "1" en -1 et 1
+    predictions <- ifelse(predictions == "1", 1, -1)
+    # Prédiction grâce au signe
+    res <- sign(predictions%*%adaBooster$factors)
+    # Recodage avec les modalités de départ
+    res <- ifelse(res == -1, adaBooster$modalities[1], adaBooster$modalities[2])
+  
+  # Classification multinomiale
+  }else{
+    res <- c()
+    for(ligne in 1:nrow(newdata)){
+      sums <- c()
+      for(mod in adaBooster$modalities){
+        ind <- which(predictions[ligne,] == mod)
+        sums <- c(sums, sum(log(1/adaBooster$factors[ind])))
+      }
+      res <- c(res, adaBooster$modalities[which.max(sums)])
+    }
+  }
   return(res)
 }
 
