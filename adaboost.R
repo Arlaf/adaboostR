@@ -1,3 +1,6 @@
+require(rpart)
+require(caret)
+
 #mettre quelque part une vérification pour que le nombre de classes a prédire ne pose pas problème
 getPredictionRPart <- function(arbre, data){
   
@@ -189,3 +192,28 @@ predictAdaboost <- function(adaBooster, newdata){
   return(res)
 }
 
+cv.adaboost <- function(formula, data, bin = T, nIter = 10, maxDepth = 5, bootstrap = T, nFolds = 10, nTimes = 10){
+  m <- nrow(data)
+  folds <- createFolds(1:nrow(data), k = nFolds, list = TRUE, returnTrain = FALSE)
+  err <- numeric(nFolds)
+  errGlob <- numeric(nTimes)
+  nColY <- which(colnames(data) == all.vars(formula)[1])
+  
+  for(j in 1:nTimes){
+    if (bin){
+      for (i in 1:nFolds){
+        ada <- adaboostBin(formula, data[-folds[[i]],], nIter, maxDepth, bootstrap)
+        pred <- as.vector(predictAdaboost(ada, data[folds[[i]],]))
+        err[i] <- sum(pred != data[folds[[i]],nColY])/length(folds[[i]])
+      }
+    }else{
+      for (i in 1:nFolds){
+        ada <- adaboostBin(formula, data[-folds[[i]],], nIter, maxDepth, bootstrap)
+        pred <- predictAdaboost(ada, data[folds[[i]],])
+        err[i] <- sum(pred != data[folds[[i]],nColY])/length(folds[[i]])
+      }
+    }
+    errGlob[j] <- mean(err)
+  }
+  return(mean(errGlob))
+}
