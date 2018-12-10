@@ -8,8 +8,21 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, include=FALSE}
+# Fonction qui découpe des données en échantillons de test et d'apprentissage
+makeTT <- function(data, ratioTest = 1/3){
+  n <- round(nrow(data)*ratioTest, 0)
+  test <- sample(1:nrow(data), n, replace = F)
+  
+  return(list(train = data[-test,],
+              test = data[test,]))
+}
+```
+
+```{r, include=FALSE}
 library(rpart)
+library(e1071)
 library(dplyr)
+library(ggplot2)
 source("D:/Repo_git/adaboostR/adaboost.R")
 
 # importation des données
@@ -17,6 +30,7 @@ data("iris")
 setwd("D:/Dropbox/M2/Advanced Supervised Learning/Projet/data")
 glass <- read.table("glass.data", header = F, sep = ",")[,-1]
 letters <- read.table("letters.data", header = F, sep = ",")
+sonar <- read.table("sonar.data", header = F, sep = ",")
 ```
 
 ```{r, include=FALSE}
@@ -24,6 +38,9 @@ letters <- read.table("letters.data", header = F, sep = ",")
 iris <- rename(iris, class = Species)
 glass <- rename(glass, class = V11)
 letters <- rename(letters, class = V1)
+sonar <- rename(sonar, class = V61)
+
+f <- class~.
 ```
 
 
@@ -32,73 +49,90 @@ letters <- rename(letters, class = V1)
 table(iris$class)
 table(glass$class)
 table(letters$class)
-```
-
-## Iris dataset
-
-```{r, include=FALSE}
-# Echantillons d'apprentissage et test
-train <- sample(1:nrow(iris), floor(2*nrow(iris)/3), replace = F)
-test <- iris[-train,]
-train <- iris[train,]
+table(sonar$class)
 ```
 
 ```{r}
-tree <- rpart(class~., train, method = "class")
-pred_tree <- predict(tree, test, type = "class")
-error_tree <- sum(pred_tree != test$class) / nrow(test)
+AdaError <- function(TT, formula = class~., nIter = 10, maxDepth = 5, bootstrap = T){
+  
+  # Identification de la colonne à prédire
+  nColY <- which(colnames(TT$train) == all.vars(formula)[1])
+  # binaire ?
+  bin <- length(unique(TT$train[,nColY])) == 2
+  
+  # Adaboost
+  if(bin){
+    # print("Cas binaire")
+    ada <- adaboostBin(formula, TT$train, nIter, maxDepth, bootstrap)
+  }else{
+    # print("Cas multinomial")
+    ada <- adaboostM1(formula, TT$train, nIter, maxDepth, bootstrap)
+  }
+  
+  # prédiction adaboost
+  pred_ada <- predictAdaboost(ada, TT$test)
+  
+  err <- sum(pred_ada != TT$test$class)/nrow(TT$test)
+  
+  return(err)
+}
+
+AdaError_vecD <- Vectorize(AdaError, vectorize.args = "maxDepth")
+AdaError_vecN <- Vectorize(AdaError, vectorize.args = "nIter")
+```
+
+
+```{r}
+TT <- makeTT(sonar)
+```
+
+```{r}
+tree <- rpart(f, TT$train, method = "class",
+              control = rpart.control(maxdepth = 30))
+pred_tree <- predict(tree, TT$test, type = "class")
+error_tree <- sum(pred_tree != TT$test$class) / nrow(TT$test)
 cat("Erreur de CART :", round(error_tree*100, 2), "%")
 ```
 
 ```{r}
-ada <- adaboostM1(class~., train, nIter = 20, maxDepth = 10)
-pred_ada <- predictAdaboost(ada, test)
-error_ada <- sum(pred_ada != test$class) / nrow(test)
-cat("Erreur d'Adaboost :", round(error_ada*100, 2), "%")
-```
+svm <- svm(f, TT$train)
+pred_svm <- predict(svm, TT$test)
+error_svm <- sum(pred_svm != TT$test$class) / nrow(TT$test)
+cat("Erreur des SVM :", round(error_svm*100, 2), "%")
 
-## Glass dataset
-
-```{r}
-# Echantillons d'apprentissage et test
-train <- sample(1:nrow(glass), floor(2*nrow(glass)/3), replace = F)
-test <- glass[-train,]
-train <- glass[train,]
 ```
 
 ```{r}
-tree <- rpart(class~., train, method = "class")
-pred_tree <- predict(tree, test, type = "class")
-error_tree <- sum(pred_tree != test$class) / nrow(test)
-cat("Erreur de CART :", round(error_tree*100, 2), "%")
+err_ada <- AdaError(TT, nIter = 20, maxDepth = 30)
+cat("Erreur d'Adaboost :", round(err_ada*100, 2), "%")
+```
+
+
+
+```{r}
+iterations <- seq(10, 50, 10)
+depths <- seq(2, 30, 1)
+
+res <- data.frame(maxDepth = rep(depths, length(iterations)),
+                  nIter = as.numeric(matrix(rep(iterations,length(depths)), nrow = length(depths), byrow= T)))
+
+col <- c()
+for(i in iterations){
+  print(i)
+  col <- c(col, AdaError_vec(TT, maxDepth = depths, nIter = i))
+}
+
+res$error <- col
+
+ggplot(res[res$nIter == 50,])+
+  geom_path(aes(x = maxDepth,
+                y = error,
+                color = as.factor(nIter)))+
+  theme_bw()
 ```
 
 ```{r}
-ada <- adaboostM1(class~., train, nIter = 100, maxDepth = 30)
-pred_ada <- predictAdaboost(ada, test)
-error_ada <- sum(pred_ada != test$class) / nrow(test)
-cat("Erreur d'Adaboost :", round(error_ada*100, 2), "%")
+
+
 ```
 
-## Letters dataset
-
-```{r}
-# Echantillons d'apprentissage et test
-train <- sample(1:nrow(letters), floor(2*nrow(letters)/3), replace = F)
-test <- letters[-train,]
-train <- letters[train,]
-```
-
-```{r}
-tree <- rpart(class~., train, method = "class")
-pred_tree <- predict(tree, test, type = "class")
-error_tree <- sum(pred_tree != test$class) / nrow(test)
-cat("Erreur de CART :", round(error_tree*100, 2), "%")
-```
-
-```{r}
-ada <- adaboostM1(class~., train, maxDepth = 30)
-# pred_ada <- predictAdaboost(ada, test)
-# error_ada <- sum(pred_ada != test$class) / nrow(test)
-# cat("Erreur d'Adaboost :", round(error_ada*100, 2), "%")
-```
