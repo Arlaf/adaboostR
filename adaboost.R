@@ -1,3 +1,6 @@
+require(rpart)
+require(caret)
+
 #mettre quelque part une vérification pour que le nombre de classes a prédire ne pose pas problème
 getPredictionRPart <- function(arbre, data){
   
@@ -27,6 +30,8 @@ adaboostM1 <- function(formula, data, nIter = 10, maxDepth = 5, bootstrap = T){
   
   m <- nrow(data)
   nColY <- which(colnames(data) == all.vars(formula)[1]) #numero de colonne où se trouve Y dans data
+  
+  
   
   distrib <- matrix(0, nrow = m, ncol = nIter)
   distrib[,1] <- 1/m
@@ -69,7 +74,7 @@ adaboostM1 <- function(formula, data, nIter = 10, maxDepth = 5, bootstrap = T){
     betas[i] <- erreur$error/(1-erreur$error)
     if(i < nIter){ # pas besoin de la distrib nIter+1
       # Z <- 2*sqrt(betas[i]) # facteur de normalisation trouvé sur wiki
-
+      
       distrib[,(i+1)] <- distrib[,i]
       distrib[erreur$indTrue,(i+1)] <- distrib[erreur$indTrue,(i+1)]*betas[i]
       Z <- sum(distrib[,(i+1)])
@@ -168,13 +173,13 @@ predictAdaboost <- function(adaBooster, newdata){
   # Classification binaire
   if(length(adaBooster$modalities) == 2){
     # Convertit les "0" et "1" en -1 et 1
-    predictions <- ifelse(predictions == "1", 1, -1)
+    predictions <- ifelse(predictions == adaBooster$modalities[1], 1, -1)
     # Prédiction grâce au signe
     res <- sign(predictions%*%adaBooster$factors)
     # Recodage avec les modalités de départ
-    res <- ifelse(res == -1, adaBooster$modalities[1], adaBooster$modalities[2])
-  
-  # Classification multinomiale
+    res <- ifelse(res == 1, adaBooster$modalities[1], adaBooster$modalities[2])
+    
+    # Classification multinomiale
   }else{
     res <- c()
     for(ligne in 1:nrow(newdata)){
@@ -189,3 +194,28 @@ predictAdaboost <- function(adaBooster, newdata){
   return(res)
 }
 
+cv.adaboost <- function(formula, data, bin = T, nIter = 10, maxDepth = 5, bootstrap = T, nFolds = 10, nTimes = 10){
+  m <- nrow(data)
+  folds <- createFolds(1:nrow(data), k = nFolds, list = TRUE, returnTrain = FALSE)
+  err <- numeric(nFolds)
+  errGlob <- numeric(nTimes)
+  nColY <- which(colnames(data) == all.vars(formula)[1])
+  
+  for(j in 1:nTimes){
+    if (bin){
+      for (i in 1:nFolds){
+        ada <- adaboostBin(formula, data[-folds[[i]],], nIter, maxDepth, bootstrap)
+        pred <- as.vector(predictAdaboost(ada, data[folds[[i]],]))
+        err[i] <- sum(pred != data[folds[[i]],nColY])/length(folds[[i]])
+      }
+    }else{
+      for (i in 1:nFolds){
+        ada <- adaboostBin(formula, data[-folds[[i]],], nIter, maxDepth, bootstrap)
+        pred <- predictAdaboost(ada, data[folds[[i]],])
+        err[i] <- sum(pred != data[folds[[i]],nColY])/length(folds[[i]])
+      }
+    }
+    errGlob[j] <- mean(err)
+  }
+  return(mean(errGlob))
+}
