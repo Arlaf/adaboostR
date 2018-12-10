@@ -151,6 +151,11 @@ adaboostBin <- function(formula, data, nIter = 10, maxDepth = 5, bootstrap = T){
 
 predictAdaboost <- function(adaBooster, newdata){
   
+  # Pour obtenir le label des modalité quand la colonne fournie est en factor
+  if(is.factor(adaBooster$modalities)){
+    adaBooster$modalities <- levels(adaBooster$modalities)
+  }
+  
   nbClassif <- length(adaBooster$factors)
   
   # Initialisation de la matrice des prédictions
@@ -162,7 +167,6 @@ predictAdaboost <- function(adaBooster, newdata){
   
   # Classification binaire
   if(length(adaBooster$modalities) == 2){
-    
     # Convertit les "0" et "1" en -1 et 1
     predictions <- ifelse(predictions == "1", 1, -1)
     # Prédiction grâce au signe

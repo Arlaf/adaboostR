@@ -1,0 +1,104 @@
+---
+title: "Adaboost benchmark"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(rpart)
+library(dplyr)
+source("D:/Repo_git/adaboostR/adaboost.R")
+
+# importation des données
+data("iris")
+setwd("D:/Dropbox/M2/Advanced Supervised Learning/Projet/data")
+glass <- read.table("glass.data", header = F, sep = ",")[,-1]
+letters <- read.table("letters.data", header = F, sep = ",")
+```
+
+```{r, include=FALSE}
+# Renommage des colonnes à prédire
+iris <- rename(iris, class = Species)
+glass <- rename(glass, class = V11)
+letters <- rename(letters, class = V1)
+```
+
+
+```{r}
+# Equilibre/déséquilibre de la classe à prédire
+table(iris$class)
+table(glass$class)
+table(letters$class)
+```
+
+## Iris dataset
+
+```{r, include=FALSE}
+# Echantillons d'apprentissage et test
+train <- sample(1:nrow(iris), floor(2*nrow(iris)/3), replace = F)
+test <- iris[-train,]
+train <- iris[train,]
+```
+
+```{r}
+tree <- rpart(class~., train, method = "class")
+pred_tree <- predict(tree, test, type = "class")
+error_tree <- sum(pred_tree != test$class) / nrow(test)
+cat("Erreur de CART :", round(error_tree*100, 2), "%")
+```
+
+```{r}
+ada <- adaboostM1(class~., train, nIter = 20, maxDepth = 10)
+pred_ada <- predictAdaboost(ada, test)
+error_ada <- sum(pred_ada != test$class) / nrow(test)
+cat("Erreur d'Adaboost :", round(error_ada*100, 2), "%")
+```
+
+## Glass dataset
+
+```{r}
+# Echantillons d'apprentissage et test
+train <- sample(1:nrow(glass), floor(2*nrow(glass)/3), replace = F)
+test <- glass[-train,]
+train <- glass[train,]
+```
+
+```{r}
+tree <- rpart(class~., train, method = "class")
+pred_tree <- predict(tree, test, type = "class")
+error_tree <- sum(pred_tree != test$class) / nrow(test)
+cat("Erreur de CART :", round(error_tree*100, 2), "%")
+```
+
+```{r}
+ada <- adaboostM1(class~., train, nIter = 100, maxDepth = 30)
+pred_ada <- predictAdaboost(ada, test)
+error_ada <- sum(pred_ada != test$class) / nrow(test)
+cat("Erreur d'Adaboost :", round(error_ada*100, 2), "%")
+```
+
+## Letters dataset
+
+```{r}
+# Echantillons d'apprentissage et test
+train <- sample(1:nrow(letters), floor(2*nrow(letters)/3), replace = F)
+test <- letters[-train,]
+train <- letters[train,]
+```
+
+```{r}
+tree <- rpart(class~., train, method = "class")
+pred_tree <- predict(tree, test, type = "class")
+error_tree <- sum(pred_tree != test$class) / nrow(test)
+cat("Erreur de CART :", round(error_tree*100, 2), "%")
+```
+
+```{r}
+ada <- adaboostM1(class~., train, maxDepth = 30)
+# pred_ada <- predictAdaboost(ada, test)
+# error_ada <- sum(pred_ada != test$class) / nrow(test)
+# cat("Erreur d'Adaboost :", round(error_ada*100, 2), "%")
+```
