@@ -217,3 +217,6 @@ cv.adaboost <- function(formula, data, bin = T, nIter = 10, maxDepth = 5, bootst
   }
   return(mean(errGlob))
 }
+
+ada = adaboostM1(V11~.,data=glass, maxDepth=30, bootstrap = F)
+arbre = rpart(V11~.,data=glass,control=rpart.control(maxdepth = 30))
