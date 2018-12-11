@@ -96,11 +96,11 @@ adaboostBin <- function(formula, data, nIter = 10, maxDepth = 5, bootstrap = T){
   nColY <- which(colnames(data) == all.vars(formula)[1])
   
   # SOLUTION TEMPORAIRE
-  data[,nColY] <- as.character(data[,nColY])
+  #data[,nColY] <- as.character(data[,nColY])
   
   # correspondance entre les modalités de la colonne à prédire et -1 ; +1
   modalities <- unique(data[,nColY])
-  data[,nColY] <- ifelse(data[,nColY] == modalities[1], -1, 1)
+  #data[,nColY] <- ifelse(data[,nColY] == modalities[1], -1, 1)
   
   
   # Initialisation de la matrice des poids
@@ -132,7 +132,7 @@ adaboostBin <- function(formula, data, nIter = 10, maxDepth = 5, bootstrap = T){
     prediction <- getPredictionRPart(arbre = modele, data = data)
     
     # Conversion des prédiction en -1 et +1
-    prediction <- as.integer(prediction)
+    #prediction <- as.integer(prediction)
     
     erreur <- getError(data[,nColY], prediction, distrib[,i])
     
